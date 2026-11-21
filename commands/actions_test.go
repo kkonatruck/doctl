@@ -45,6 +45,34 @@ func TestActionList(t *testing.T) {
 	})
 }
 
+// TestActionListAfter uses the early-stopping list exactly once and
+// never falls back to the full List (#1683). gomock fails the test on
+// any unexpected call, so no List() expectation is set.
+func TestActionListAfter(t *testing.T) {
+	withTestClient(t, func(config *CmdConfig, tm *tcMocks) {
+		after, err := time.Parse(time.RFC3339, "2025-04-11T00:00:00Z")
+		assert.NoError(t, err)
+		tm.actions.EXPECT().ListAfter(after).Return(testActionList, nil).Times(1)
+
+		config.Doit.Set(config.NS, doctl.ArgActionAfter, "2025-04-11T00:00:00Z")
+
+		err = RunCmdActionList(config)
+		assert.NoError(t, err)
+	})
+}
+
+// TestActionListInvalidAfterMakesNoRequests: a bad --after date must
+// fail before any actions request is made. No mock expectations are
+// set, so gomock fails the test if either list method is called.
+func TestActionListInvalidAfterMakesNoRequests(t *testing.T) {
+	withTestClient(t, func(config *CmdConfig, tm *tcMocks) {
+		config.Doit.Set(config.NS, doctl.ArgActionAfter, "not-a-date")
+
+		err := RunCmdActionList(config)
+		assert.Error(t, err)
+	})
+}
+
 func TestActionGet(t *testing.T) {
 	withTestClient(t, func(config *CmdConfig, tm *tcMocks) {
 		tm.actions.EXPECT().Get(1).Return(&testAction, nil)

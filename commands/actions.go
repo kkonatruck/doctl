@@ -75,7 +75,20 @@ For example, if you find an action when calling `+"`"+`doctl compute action list
 
 // RunCmdActionList run action list.
 func RunCmdActionList(c *CmdConfig) error {
-	actions, err := c.Actions().List()
+	// Parse --after before fetching so an invalid date fails without
+	// any API requests, and so a valid one can stop pagination early
+	// instead of fetching every page only to filter it down (#1683).
+	after, hasAfter, err := actionAfter(c)
+	if err != nil {
+		return err
+	}
+
+	var actions do.Actions
+	if hasAfter {
+		actions, err = c.Actions().ListAfter(after)
+	} else {
+		actions, err = c.Actions().List()
+	}
 	if err != nil {
 		return err
 	}
@@ -136,14 +149,8 @@ func filterActionList(c *CmdConfig, in do.Actions) (do.Actions, error) {
 		}
 	}
 
-	afterStr, err := c.Doit.GetString(c.NS, doctl.ArgActionAfter)
-	if err != nil {
+	if after, _, err = actionAfter(c); err != nil {
 		return nil, err
-	}
-	if afterStr != "" {
-		if after, err = time.Parse(time.RFC3339, afterStr); err != nil {
-			return nil, err
-		}
 	}
 
 	out := do.Actions{}
@@ -185,6 +192,25 @@ func filterActionList(c *CmdConfig, in do.Actions) (do.Actions, error) {
 	}
 
 	return out, nil
+}
+
+// actionAfter parses the --after flag. The second result is false when
+// the flag was not set.
+func actionAfter(c *CmdConfig) (time.Time, bool, error) {
+	afterStr, err := c.Doit.GetString(c.NS, doctl.ArgActionAfter)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	if afterStr == "" {
+		return time.Time{}, false, nil
+	}
+
+	after, err := time.Parse(time.RFC3339, afterStr)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+
+	return after, true, nil
 }
 
 func isZeroTime(t time.Time) bool {

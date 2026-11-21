@@ -14,11 +14,13 @@ limitations under the License.
 package do
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
 	"github.com/digitalocean/godo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_PaginateResp(t *testing.T) {
@@ -37,6 +39,38 @@ func Test_PaginateResp(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Len(t, list, 5)
+}
+
+func Test_PaginateRespWhileStopsEarly(t *testing.T) {
+	resp := &godo.Response{Links: &godo.Links{Pages: &godo.Pages{Last: "http://example.com/?page=5"}}}
+	calls := 0
+	gen := func(opt *godo.ListOptions) ([]any, *godo.Response, error) {
+		calls++
+		return []any{opt.Page}, resp, nil
+	}
+
+	list, err := PaginateRespWhile(gen, func(page []any) bool {
+		return page[0].(int) < 2
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []any{1, 2}, list, "the page that stops pagination is included")
+	assert.Equal(t, 2, calls, "no page after the stopping page should be requested")
+}
+
+func Test_PaginateRespWhileReturnsPageError(t *testing.T) {
+	resp := &godo.Response{Links: &godo.Links{Pages: &godo.Pages{Last: "http://example.com/?page=5"}}}
+	calls := 0
+	gen := func(opt *godo.ListOptions) ([]any, *godo.Response, error) {
+		calls++
+		if opt.Page == 2 {
+			return nil, nil, errors.New("page failed")
+		}
+		return []any{opt.Page}, resp, nil
+	}
+
+	_, err := PaginateRespWhile(gen, func([]any) bool { return true })
+	assert.ErrorContains(t, err, "page failed")
+	assert.Equal(t, 2, calls)
 }
 
 func Test_Pagination_fetchPage(t *testing.T) {

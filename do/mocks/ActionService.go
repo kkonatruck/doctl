@@ -11,6 +11,7 @@ package mocks
 
 import (
 	reflect "reflect"
+	time "time"
 
 	do "github.com/digitalocean/doctl/do"
 	gomock "go.uber.org/mock/gomock"
@@ -68,4 +69,19 @@ func (m *MockActionsService) List() (do.Actions, error) {
 func (mr *MockActionsServiceMockRecorder) List() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockActionsService)(nil).List))
+}
+
+// ListAfter mocks base method.
+func (m *MockActionsService) ListAfter(arg0 time.Time) (do.Actions, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAfter", arg0)
+	ret0, _ := ret[0].(do.Actions)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAfter indicates an expected call of ListAfter.
+func (mr *MockActionsServiceMockRecorder) ListAfter(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAfter", reflect.TypeOf((*MockActionsService)(nil).ListAfter), arg0)
 }

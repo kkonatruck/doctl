@@ -107,6 +107,41 @@ func PaginateResp(gen Generator) ([]any, error) {
 	return items, nil
 }
 
+// PaginateRespWhile paginates a Response one page at a time, in page
+// order, and stops fetching further pages as soon as shouldContinue
+// returns false for a fetched page. The page that stopped pagination is
+// included in the result. Unlike PaginateResp, which silently drops a
+// page whose fetch fails, a failed page here is returned as an error so
+// callers do not silently lose part of a filtered list. It is for
+// callers whose filter can prove, from a fetched page, that no later
+// page can match (see actionsService.ListAfter).
+func PaginateRespWhile(gen Generator, shouldContinue func(page []any) bool) ([]any, error) {
+	var items []any
+
+	lp := 1
+	for page := 1; page <= lp; page++ {
+		pageItems, resp, err := gen(&godo.ListOptions{Page: page, PerPage: perPage})
+		if err != nil {
+			return nil, err
+		}
+
+		if page == 1 {
+			lp, err = lastPage(resp)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		items = append(items, pageItems...)
+
+		if shouldContinue != nil && !shouldContinue(pageItems) {
+			break
+		}
+	}
+
+	return items, nil
+}
+
 func fetchPage(gen Generator, page int) ([]any, error) {
 	opt := &godo.ListOptions{Page: page, PerPage: perPage}
 	items, _, err := gen(opt)
